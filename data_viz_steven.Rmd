@@ -1,0 +1,242 @@
+---
+title: "data_viz_steven"
+author: "Steven Cognac"
+date: "8/18/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+## General use
+library(tidyverse)
+library(janitor)
+library(here)
+
+## specifically for data viz
+library(patchwork)
+library(ggrepel)
+library(gghighlight)
+library(paletteer)
+library(ggExtra)
+library(ggbeeswarm)
+
+library(gapminder)
+
+library(sf)
+
+
+```
+## Get the lizards data
+```{r}
+
+lizards <- read_csv(here("data_tidy", "lizards.csv"))
+```
+## make histogram of lizard weight
+
+```{r}
+## if you are changing aesthics based on a constant, does not need to be in aesthetics
+
+lizard_hist <- ggplot(data = lizards, aes(weight)) +
+  geom_histogram(fill = "orange",
+                 color = "blue",
+                 size = 0.5,
+                 linetype = "dotdash") +
+  labs(x = "Weight",
+       y = "Counts")
+
+lizard_hist
+
+
+## can also do if you want to stack different types of plots
+lizard_hist2 <- ggplot() +
+  geom_histogram(data = lizards, aes(weight)) +
+  labs(x = "Weight",
+       y = "Counts")
+
+
+
+```
+
+## scatterplot with total_length on x-axis and weight on y-axis
+```{r}
+
+## each shape from 0 - 25 represents different dot graphics
+# alpha - transparency
+
+lizard_scatter <- ggplot(data = lizards, aes(x = total_length, y = weight)) +
+  geom_point(shape = 22,
+             fill = "yellow", # fill color
+             color = "red", # color of shape outline
+             size = 1.5, # size of dots
+             alpha = 0.2) # transparency
+
+
+lizard_scatter
+```
+
+## Make a bubble plot where color of points changes based on common_name and size of points varies based on total_length. total_length x axis, weight y axis
+```{r}
+lizards_bubble <- ggplot(data = lizards, aes(x = total_length, y = weight)) +
+  geom_point(aes(color = common_name,
+                 size = total_length),
+             shape = 22,
+             fill = "black") +
+  theme_light() +
+  facet_grid()
+
+lizards_bubble
+
+```
+
+## redo of above
+```{r}
+
+lizards_bubble2 <- ggplot(data = lizards, aes(x = total_length, y = weight)) +
+  geom_point(aes(color = common_name)) +
+  theme_light() +
+  facet_wrap(~common_name, ncol = 3)
+
+lizards_bubble2
+```
+## 
+```{r}
+lizards_bubble3 <- ggplot(data = lizards, aes(x = total_length, y = weight)) +
+  geom_point(aes(color = common_name)) +
+  facet_grid(sex ~ tail)
+
+lizards_bubble3
+
+```
+## plot lizard counts by common_name
+```{r}
+lizard_counts <- lizards %>% 
+  group_by(common_name) %>% 
+  summarize(count = n()) %>% 
+  mutate(common_name = fct_reorder(common_name, count))
+
+lizard_counts
+
+
+# same thing
+lizard_count2 <- lizards %>% count(common_name)
+lizard_count2
+
+lizard_counts_cn_tail <- lizards %>% count(common_name, tail)
+lizard_counts_cn_tail
+
+
+
+```
+
+## plot lizard counts
+```{r}
+# x and y axis switched to make it more readable.
+# could also use the + coord_flip() function
+# fct_reorder() lets you reorder some observation by a specified class
+
+lizard_count_plot <- ggplot(data = lizard_counts, aes(y = fct_reorder(common_name, count), x = count)) +
+  geom_col(fill = "blue") +
+  labs(x = "Lizard counts",
+       y = "Common Name")
+
+lizard_count_plot
+```
+
+## Axis scale breaks, limits, & labels
+
+### scatterplot: total_length (x) versus weight (y)
+```{r}
+weight_length_plot <- ggplot(data = lizards, aes(x = total_length, y = weight)) +
+  geom_point() +
+  scale_x_continuous(breaks = c(50, 100, 150, 200, 300, 400, 500),
+                     limits = c(0, 600),
+                     expand = c(0, 100)) +
+  scale_y_continuous(expand = c(0, 0))
+  labs(x = "Total length ()",
+       y = "Weight ()")
+
+weight_length_plot
+
+```
+
+## transform date column to class date, then find counts of observations by date
+```{r}
+lizard_counts_date <- lizards %>% 
+  mutate(date = lubridate::mdy(date)) %>% 
+  count(date)
+
+lizard_counts_date
+
+class(lizard_counts_date$date)
+
+```
+## make 
+```{r}
+
+date_plot <- ggplot(data = lizard_counts_date, aes(x = date, y = n)) +
+  geom_line() +
+  scale_x_date(date_breaks = "3 years",
+               date_labels = "%Y") +
+  labs(x = "Date",
+       y = "Counts")
+
+date_plot
+
+```
+
+```{r}
+
+weight_length <- ggplot(data = lizards, aes(x = total_length, y = weight)) +
+  geom_point(aes(color = weight)) +
+  scale_color_stepsn(colors = c("green", "blue", "purple", "red", "orange"), 
+                     breaks = c(0, 3, 5, 10, 30, 40))
+  # scale_color_gradientn(colors = c("black", "green", "orange", "cyan", "purple"))
+  # scale_color_gradient(low = "red", high = "blue")
+  
+
+weight_length
+
+```
+
+## update a color scheme using a palette in paletteer
+
+### make a horizontal box plot with common_name (y), and total_length (x), with color changing based on common_name
+```{r}
+lizards_fct <- lizards %>% 
+  mutate(common_name = fct_reorder(common_name, total_length, .fun = median))
+
+name_length_plot <- ggplot(data = lizards_fct, aes(y = common_name, x = total_length)) +
+  geom_boxplot(aes(fill = common_name), show.legend = FALSE) +
+  scale_fill_paletteer_d(palette = "rcartocolor::Earth")
+
+
+name_length_plot
+```
+
+
+## 
+```{r}
+
+practice_plot <- ggplot(data = lizards, aes(x = total_length, y = weight)) +
+  geom_point() +
+  theme(
+    # panel.grid = element_blank()
+    # plot.background = element_rect(fill = "cyan4")
+    
+    axis.text.x = element_text(color = "orange"),
+    axis.title = element_text(color = "green",
+                              size = 13),
+    
+    panel.background = element_rect(fill = "yellow",
+                                    color = "purple",
+                                    size = 15),
+    panel.grid.major.x = element_line(color = "red"),
+    panel.grid.major = element_line(color = "blue"),
+    panel.grid.minor.y = element_line(color = "green")
+    
+    
+  )
+practice_plot
+```
+
