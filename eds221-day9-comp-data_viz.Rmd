@@ -1,0 +1,223 @@
+---
+title: "day9 Data Viz Continued"
+author: "Steven Cognac"
+date: "8/19/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# General use
+library(tidyverse)
+library(janitor)
+library(here)
+
+## specifically for data viz
+library(patchwork)
+library(ggrepel)
+library(gghighlight)
+library(paletteer)
+library(ggExtra)
+library(ggbeeswarm)
+
+library(gapminder)
+
+library(sf)
+
+
+```
+
+## Get the lizards data
+```{r}
+
+lizards <- read_csv(here("data_tidy", "lizards.csv"))
+```
+
+## ggrepel
+
+## make subset
+
+```{r}
+
+ww_lizards <- lizards %>% 
+  filter(common_name == "western whiptail",
+         site == "sand")
+
+ww_lizards_plot <- ggplot(data = ww_lizards, aes(x = total_length, y = weight)) +
+  geom_point() +
+  labs(x = "Total length (cm)",
+       y = "Weight (g)") +
+  geom_text_repel(aes(label = toe_num),
+                  size = 3,
+                  max.overlaps = 10)
+
+ww_lizards_plot
+
+```
+
+## Using gapminder, filter for only Europe, create a scatterplot with gdpPercap (x) and lifeExp (y), labeled by country name
+```{r}
+
+
+europe <- gapminder %>% 
+  filter(continent == "Europe") %>% 
+  filter(year == 1957)
+
+europe_df <- data.frame(europe)
+
+europe_gdp_1957 <- ggplot(data = europe, aes(x = gdpPercap, y = lifeExp)) +
+  geom_point() +
+  geom_text_repel(aes(label = country))
+
+europe_gdp_1957
+
+europe_gdp_1957 + 
+```
+
+## 
+
+```{r}
+p <- ggplot(data = lizards, aes(x = total_length, y = weight)) + 
+  geom_point()
+
+p + gghighlight(toe_num == 250, label_key = toe_num)
+```
+```{r}
+q <- ggplot(data = lizards, aes(x = total_length, y = weight)) +
+  geom_line(aes(color = common_name))
+
+## gghighlight lets you highlight things based on specific conditions in your dataset
+q + gghighlight(max(weight) > 30)
+
+
+```
+
+## Patchwork library - for compound figures
+ - makes it easier to put figures together in a single graphic
+ - similar to facet_wrap(), but different
+
+```{r}
+
+# uses rules of PEMDAS to combine multiple plots & dataframes
+
+(p | q) / q &
+  theme_minimal()
+
+```
+# explore new graph types
+
+### Marginal plots <- uses library(ggExtra)
+
+```{r}
+whiptail <- lizards %>% 
+  filter(common_name== "western whiptail") %>% 
+  drop_na()
+
+
+```
+
+```{r}
+whiptail_plot <- ggplot(data = whiptail, aes(x = total_length, y = weight)) +
+  geom_point() +
+  geom_rug()
+  
+  
+
+whiptail_plot
+
+```
+
+## marginal plot with boxplots
+```{r}
+
+whiptail_plot <- ggplot(data = whiptail, aes(x = total_length, y = weight)) +
+  geom_point(aes(color = sex), size = 2) +
+  scale_color_manual(values = c("cyan4", "goldenrod", "black"),
+                     name = "Sex:",
+                     labels = c("female", "juvenile", "male")) +
+  theme_minimal() +
+  theme(
+    
+    legend.position = "bottom"
+    
+  )
+                     
+
+whiptail_plot
+
+# create boxplot on margins of scatterplot
+ggMarginal(whiptail_plot, type = "boxplot", groupColour = TRUE)
+
+```
+## Beeswarm plot
+
+ - benefits of jitterplot & advantages of density or histogram
+ - width of beeswarm plot is based on number of observations of the specific value
+ 
+```{r}
+swarm <- ggplot(data = whiptail, aes(x = sex, y = weight)) +
+  geom_violin(fill = NA) +
+  geom_beeswarm() +
+  geom_boxplot(fill = NA)
+
+swarm
+```
+
+## make a heatmap with geom_tile
+
+### make new df named lizards counts with date converted to class Date. Then count by year and common_name # of lizards observed
+
+```{r}
+
+lizard_counts <- lizards %>% 
+  
+  ## create new date column and then get a year column
+  mutate(date_new = lubridate::mdy(date)) %>% 
+  mutate(year = lubridate::year(date_new)) %>% 
+  
+  # group by year and common_name
+  # can also use count(year, common_name)
+  
+  group_by(year, common_name) %>% 
+  summarize(counts = n())
+  
+
+```
+## useful because you can show three variables on a two dimensional scale
+
+```{r}
+heat <- ggplot(data = lizard_counts, aes(x = year, y = common_name)) +
+  geom_tile(aes(fill = counts)) +
+  geom_text(aes(label = counts),
+            color = "white",
+            size = 3) +
+  scale_fill_viridis_c()
+
+heat
+            
+
+```
+
+## make a map of lizard observations
+```{r}
+
+jornada_veg <- read_sf(here("data_raw", "spatial_vegetation", "doc.kml")) %>% 
+  select(Name) %>% 
+  clean_names()
+
+map <- ggplot(data = jornada_veg) +
+  geom_sf(aes(fill = name), color = NA, size = 0.01) +
+   scale_fill_paletteer_d(palette = "ggthemes::manyeys") +
+  labs(x = "Longitude",
+       y = "Latitude",
+       fill = "Dominant Vegetation") +
+  theme_void()
+  
+
+map
+
+ggsave(here("figs", "map.png"))
+
+```
+
